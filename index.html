@@ -608,11 +608,4 @@ function showToast(type, msg) {
   t.className='show '+type; t.style.display='flex';
   setTimeout(()=>{ t.style.display='none'; t.className=''; },4500);
 }
-function showSaving(msg) { document.getElementById('saving-sub').textContent=msg; document.getElementById('saving-overlay').classList.add('active'); }
-function setSaving(msg) { document.getElementById('saving-sub').textContent=msg; }
-function hideSaving() { document.getElementById('saving-overlay').classList.remove('active'); }
-
-init();
-</script>
-</body>
-</html>
+function showSaving(msg) { document.getElementById('saving-sub').textContent=msg; document.getElementById('saving-overlay').classList.add('activ
