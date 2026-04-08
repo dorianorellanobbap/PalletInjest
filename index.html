@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDS Import Tool — B&B Albany Pallet Co.</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222;
+    --border: #2e2e2e;
+    --accent: #f5a623;
+    --accent2: #e8530a;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --text: #e8e8e8;
+    --muted: #666;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --display: 'Bebas Neue', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; display: flex; flex-direction: column; }
+
+  header { border-bottom: 1px solid var(--border); padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo { font-family: var(--display); font-size: 28px; letter-spacing: 2px; color: var(--accent); line-height: 1; }
+  .logo span { color: var(--text); }
+  .subtitle { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+  .divider { width: 1px; height: 36px; background: var(--border); margin: 0 8px; }
+  .badge { font-family: var(--mono); font-size: 10px; background: var(--accent2); color: #fff; padding: 3px 8px; border-radius: 2px; text-transform: uppercase; letter-spacing: 1px; }
+
+  #auth-area { display: flex; align-items: center; gap: 12px; }
+  .user-chip { display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 2px; padding: 6px 12px; font-family: var(--mono); font-size: 11px; }
+  .user-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); flex-shrink: 0; }
+
+  .btn { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 8px 16px; border: none; border-radius: 2px; cursor: pointer; transition: all 0.15s; font-weight: 500; }
+  .btn-ms { background: #0078d4; color: #fff; display: flex; align-items: center; gap: 8px; }
+  .btn-ms:hover { background: #006cbf; }
+  .btn-signout { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 10px; padding: 6px 10px; }
+  .btn-signout:hover { color: var(--red); border-color: var(--red); }
+  .btn-primary { background: var(--accent); color: #000; font-size: 12px; padding: 10px 20px; }
+  .btn-primary:hover { background: #f0b842; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 12px; padding: 10px 20px; }
+  .btn-ghost:hover { color: var(--text); border-color: #444; }
+
+  .ms-logo { width: 16px; height: 16px; flex-shrink: 0; }
+
+  main { flex: 1; padding: 32px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+  #login-gate { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; gap: 24px; }
+  .gate-icon { font-size: 64px; }
+  .gate-title { font-family: var(--display); font-size: 52px; letter-spacing: 2px; line-height: 1; }
+  .gate-title span { color: var(--accent); }
+  .gate-sub { font-family: var(--mono); font-size: 12px; color: var(--muted); max-width: 400px; line-height: 1.8; }
+  .btn-ms-large { background: #0078d4; color: #fff; font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; padding: 14px 28px; border: none; border-radius: 2px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s; }
+  .btn-ms-large:hover { background: #006cbf; }
+  .gate-note { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  #app-content { display: none; }
+
+  #sp-status-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 24px; font-family: var(--mono); font-size: 11px; }
+  .sp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sp-dot.connecting { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: pulse 1s infinite; }
+  .sp-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .sp-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .sp-label { color: var(--muted); }
+  .sp-path { color: var(--muted); margin-left: auto; font-size: 10px; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 24px; }
+  .panel-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; background: var(--surface2); }
+  .step-num { font-family: var(--display); font-size: 22px; color: var(--accent); line-height: 1; min-width: 24px; }
+  .panel-title { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .panel-body { padding: 20px; }
+
+  .drop-zone { border: 2px dashed var(--border); border-radius: 4px; padding: 32px 20px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(245,166,35,0.05); }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon { font-size: 32px; margin-bottom: 8px; display: block; }
+  .drop-label { font-family: var(--mono); font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .drop-label strong { color: var(--accent); }
+  .file-loaded { font-family: var(--mono); font-size: 12px; color: var(--green); margin-top: 10px; display: none; }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: var(--mono); font-size: 11px; margin-top: 14px; }
+  .field-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; background: var(--bg); border-radius: 2px; border: 1px solid var(--border); }
+  .field-key { color: var(--muted); }
+  .field-val { color: var(--text); font-weight: 500; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .field-val.empty { color: var(--muted); font-style: italic; }
+
+  #diff-section { display: none; }
+  .diff-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); }
+  .diff-title { font-family: var(--display); font-size: 20px; letter-spacing: 1px; }
+  .diff-mode-badge { font-family: var(--mono); font-size: 10px; padding: 4px 10px; border-radius: 2px; text-transform: uppercase; letter-spacing: 1px; }
+  .mode-new { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .mode-update { background: rgba(234,179,8,0.15); color: var(--yellow); border: 1px solid rgba(234,179,8,0.3); }
+
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  thead tr { background: var(--bg); border-bottom: 2px solid var(--border); }
+  th { padding: 10px 14px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 500; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .diff-row-changed { background: rgba(234,179,8,0.05); }
+  .diff-row-new { background: rgba(34,197,94,0.05); }
+
+  .val-old { color: var(--red); text-decoration: line-through; }
+  .val-new { color: var(--green); }
+  .val-same { color: var(--muted); }
+  .val-empty { color: var(--muted); font-style: italic; }
+
+  .change-tag { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .tag-changed { background: rgba(234,179,8,0.2); color: var(--yellow); }
+  .tag-new { background: rgba(34,197,94,0.2); color: var(--green); }
+  .tag-same { background: rgba(102,102,102,0.2); color: var(--muted); }
+  .tag-manual { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .action-bar { display: flex; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--border); background: var(--surface2); align-items: center; }
+  .action-note { font-family: var(--mono); font-size: 10px; color: var(--muted); flex: 1; text-align: right; }
+  .protect-note { font-family: var(--mono); font-size: 10px; color: var(--muted); padding: 8px 14px; background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.2); border-radius: 2px; margin: 12px 14px 0; }
+  .toggle-show-same { font-family: var(--mono); font-size: 10px; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+  .toggle-show-same:hover { color: var(--text); }
+  .checkbox-col { width: 40px; text-align: center; }
+  input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .empty-state .big { font-family: var(--display); font-size: 48px; color: var(--border); display: block; margin-bottom: 8px; }
+
+  #saving-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; align-items: center; justify-content: center; }
+  #saving-overlay.active { display: flex; }
+  .saving-box { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 36px 52px; text-align: center; }
+  .saving-title { font-family: var(--display); font-size: 32px; color: var(--accent); letter-spacing: 2px; margin-bottom: 6px; }
+  .saving-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 20px auto 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #toast { position: fixed; bottom: 28px; right: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 14px 20px; font-family: var(--mono); font-size: 12px; display: none; align-items: center; gap: 10px; z-index: 200; max-width: 380px; }
+  #toast.show { display: flex; }
+  #toast.success { border-color: var(--green); }
+  #toast.error { border-color: var(--red); }
+
+  .status-bar { padding: 10px 32px; font-family: var(--mono); font-size: 11px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); background: var(--bg); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.yellow { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .status-dot.red { background: var(--red); }
+  .status-text { color: var(--muted); }
+
+  footer { padding: 14px 32px; border-top: 1px solid var(--border); font-family: var(--mono); font-size: 10px; color: var(--muted); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div>
+      <div class="logo">B&B <span>Albany</span></div>
+      <div class="subtitle">Pallet Co. — PDS Import Tool</div>
+    </div>
+    <div class="divider"></div>
+    <div class="badge">v2.0</div>
+  </div>
+  <div id="auth-area">
+    <button class="btn btn-ms" onclick="signIn()">
+      <svg class="ms-logo" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- Login gate -->
+  <div id="login-gate">
+    <div class="gate-icon">🔐</div>
+    <div class="gate-title">Sign in to <span>get started</span></div>
+    <div class="gate-sub">Use your B&B Albany Pallet Co. Microsoft work account. The tool will connect directly to your SharePoint database.</div>
+    <button class="btn-ms-large" onclick="signIn()">
+      <svg class="ms-logo" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <div class="gate-note">B&B Albany Pallet Co. accounts only · bbpallet.sharepoint.com</div>
+  </div>
+
+  <!-- App -->
+  <div id="app-content">
+
+    <div id="sp-status-bar">
+      <div class="sp-dot connecting" id="sp-dot"></div>
+      <span class="sp-label">SharePoint:</span>
+      <span id="sp-status-text">Connecting...</span>
+      <span class="sp-path">Production / Backend Data / pallet_data_org.xlsx</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="step-num">1</div>
+        <div class="panel-title">Drop PDS XML Export</div>
+      </div>
+      <div class="panel-body">
+        <div class="drop-zone" id="xml-drop">
+          <input type="file" id="xml-input" accept=".xml">
+          <span class="drop-icon">📄</span>
+          <div class="drop-label">Drop <strong>.xml</strong> file here or click to browse</div>
+        </div>
+        <div class="file-loaded" id="xml-loaded">✓ XML loaded</div>
+        <div class="field-grid" id="xml-fields" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div id="diff-section">
+      <div class="panel">
+        <div class="diff-header">
+          <div>
+            <div class="diff-title" id="diff-title">REVIEWING CHANGES</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px" id="diff-subtitle"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="toggle-show-same" id="toggle-same-btn" onclick="toggleSameRows()">Show unchanged fields</button>
+            <div class="diff-mode-badge" id="diff-mode-badge"></div>
+          </div>
+        </div>
+
+        <div id="protect-note" class="protect-note" style="display:none">
+          🔒 <span style="color:var(--red)">PROTECTED</span> fields will never be overwritten by import — edit them directly in SharePoint (Customer Name, Stack Height, Load Size, Primary Nailer, BDFT, Notes2).
+        </div>
+
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th class="checkbox-col"><input type="checkbox" id="select-all" onchange="toggleAll(this)"></th>
+                <th>Field</th>
+                <th>Current Value (SharePoint)</th>
+                <th>Incoming Value (PDS XML)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="diff-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn btn-primary" id="apply-btn" onclick="applyChanges()" disabled>☁ Save to SharePoint</button>
+          <button class="btn btn-ghost" onclick="resetImport()">Reset</button>
+          <div class="action-note" id="apply-note">Select fields to apply</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="empty-hint" class="empty-state">
+      <span class="big">↑</span>
+      Drop a PDS XML file above to begin
+    </div>
+  </div>
+</main>
+
+<div id="saving-overlay">
+  <div class="saving-box">
+    <div class="saving-title">Saving to SharePoint</div>
+    <div class="saving-sub" id="saving-sub">Please wait...</div>
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<div id="toast">
+  <span id="toast-icon"></span>
+  <span id="toast-msg"></span>
+</div>
+
+<div class="status-bar">
+  <div class="status-dot" id="status-dot"></div>
+  <div class="status-text" id="status-text">Not signed in</div>
+</div>
+
+<footer>
+  <span>B&B Albany Pallet Co. — Internal Tool</span>
+  <span>PDS v6.11.2 compatible · SharePoint Live</span>
+</footer>
+
+<script>
+const CONFIG = {
+  clientId:    '9264b811-8117-45ca-897a-1a705c942a9d',
+  tenantId:    '42a50820-a724-40e5-93fe-3a6c4eb3845c',
+  redirectUri: 'https://dorianorellanobbap.github.io/PalletInjest/',
+  spHost:      'bbpallet.sharepoint.com',
+  spSitePath:  '/sites/Production',
+  spLibrary:   'Backend Data',
+  spFile:      'pallet_data_org.xlsx',
+  graphBase:   'https://graph.microsoft.com/v1.0',
+};
+
+const SCOPES = ['Files.ReadWrite', 'Sites.ReadWrite.All', 'User.Read'];
+const PROTECTED = ['Customer Name','Stack Height','Load Size','Primary Nailer','BDFT','Notes2'];
+
+const msalInstance = new msal.PublicClientApplication({
+  auth: { clientId: CONFIG.clientId, authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`, redirectUri: CONFIG.redirectUri },
+  cache: { cacheLocation: 'sessionStorage' }
+});
+
+let currentUser = null, accessToken = null;
+let xmlData = null, dbRows = [], spFileId = null;
+let existingRowIdx = -1, showSameRows = false;
+
+async function init() {
+  await msalInstance.initialize();
+  const resp = await msalInstance.handleRedirectPromise();
+  if (resp) { currentUser = resp.account; accessToken = resp.accessToken; onSignedIn(); }
+  else {
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length) { currentUser = accounts[0]; await refreshToken(); onSignedIn(); }
+  }
+}
+
+async function signIn() {
+  await msalInstance.initialize();
+  msalInstance.loginRedirect({ scopes: SCOPES });
+}
+
+async function signOut() { msalInstance.logoutRedirect(); }
+
+async function refreshToken() {
+  const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: currentUser });
+  accessToken = r.accessToken;
+}
+
+function onSignedIn() {
+  const name = currentUser.name || currentUser.username;
+  document.getElementById('login-gate').style.display = 'none';
+  document.getElementById('app-content').style.display = 'block';
+  document.getElementById('auth-area').innerHTML = `
+    <div class="user-chip"><div class="user-dot"></div>${name}</div>
+    <button class="btn btn-signout" onclick="signOut()">Sign out</button>`;
+  setStatus('green', `Signed in as ${name}`);
+  connectSharePoint();
+}
+
+async function gget(url) {
+  await refreshToken();
+  const r = await fetch(CONFIG.graphBase + url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!r.ok) throw new Error(`Graph ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function connectSharePoint() {
+  setSP('connecting', 'Connecting...');
+  try {
+    const site = await gget(`/sites/${CONFIG.spHost}:${CONFIG.spSitePath}`);
+    const drives = await gget(`/sites/${site.id}/drives`);
+    const drive = drives.value.find(d => d.name === CONFIG.spLibrary);
+    if (!drive) throw new Error(`Library "${CONFIG.spLibrary}" not found`);
+    const file = await gget(`/drives/${drive.id}/root:/${CONFIG.spFile}`);
+    spFileId = { driveId: drive.id, itemId: file.id };
+    await loadDB(drive.id, file.id);
+    setSP('connected', `Connected — ${dbRows.length} pallets loaded`);
+    setStatus('green', `SharePoint ready · ${dbRows.length} pallets`);
+  } catch(e) {
+    setSP('error', 'Failed: ' + e.message);
+    setStatus('red', 'SharePoint error: ' + e.message);
+    showToast('error', e.message);
+  }
+}
+
+async function loadDB(driveId, itemId) {
+  await refreshToken();
+  const r = await fetch(`${CONFIG.graphBase}/drives/${driveId}/items/${itemId}/content`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const buf = await r.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  dbRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+}
+
+function setSP(state, text) {
+  document.getElementById('sp-dot').className = 'sp-dot ' + state;
+  document.getElementById('sp-status-text').textContent = text;
+}
+
+function parseXML(str) {
+  const doc = new DOMParser().parseFromString(str, 'application/xml');
+  const pc = doc.querySelector('PalletClassification');
+  const note = doc.querySelector('Note');
+  const fastener = doc.querySelector('Fastener');
+  const comps = Array.from(doc.querySelectorAll('Component'));
+  const gc = (loc, pos) => comps.find(c => c.getAttribute('Location')===loc && c.getAttribute('BoardPositionType')===pos);
+  const n = (el, a) => el ? (parseFloat(el.getAttribute(a))||'') : '';
+  const s = (el, a) => el ? (el.getAttribute(a)||'') : '';
+  const tdL=gc('TOP DECK','LEADBOARD'), tdI=gc('TOP DECK','INTERIOR');
+  const bdL=gc('BOTTOM DECK','LEADBOARD'), bdI=gc('BOTTOM DECK','INTERIOR');
+  const sE=gc('STRINGERS','EXTERIOR'), sI=gc('STRINGERS','INTERIOR');
+  const pid = doc.querySelector('PalletId')?.textContent?.trim()||'';
+  const pL=n(pc,'PalletLength'), pW=n(pc,'PalletWidth');
+  const pStyle=s(pc,'PalletStyle'), entry=s(pc,'EntryStyle');
+  const shapeMap={'DOUBLE-FACE NON-REVERSIBLE':'Flush','DOUBLE-FACE REVERSIBLE':'Flush','SINGLE-FACE':'Flush'};
+  const noteText = note ? note.textContent.replace(/\r\n|\r|\n/g,' ').trim() : '';
+  const nailStr = fastener ? `${s(fastener,'FastenerID')} - ${n(fastener,'Number')} nails` : '';
+  return {
+    'Pallet Pt No': pid,
+    'Pallet Side Shape': pStyle ? (shapeMap[pStyle.toUpperCase()]||pStyle) : '',
+    'Str1 Qty': sE?s(sE,'Number'):'', 'Str2 Qty': sI?s(sI,'Number'):'',
+    'Str Features': entry,
+    'Str1 Lth': sE?n(sE,'Length'):'', 'Str1 Wth': sE?n(sE,'Width'):'', 'Str1 Ht': sE?n(sE,'Height'):'',
+    'Str2 Lth': sI?n(sI,'Length'):'', 'Str2 Wth': sI?n(sI,'Width'):'', 'Str2 Ht': sI?n(sI,'Height'):'',
+    'TDck Wing': '',
+    'TDck1 Qty': tdL?s(tdL,'Number'):'', 'TDck2 Qty': tdI?s(tdI,'Number'):'',
+    'TDck Features': 'Plain',
+    'TDck1 Lth': tdL?n(tdL,'Length'):'', 'TDck1 Wth': tdL?n(tdL,'Width'):'', 'TDck1 Ht': tdL?n(tdL,'Height'):'',
+    'TDck2 Lth': tdI?n(tdI,'Length'):'', 'TDck2 Wth': tdI?n(tdI,'Width'):'', 'TDck2 Ht': tdI?n(tdI,'Height'):'',
+    'BDck Wing': '',
+    'BDck1 Qty': bdL?s(bdL,'Number'):'', 'BDck2 Qty': bdI?s(bdI,'Number'):'',
+    'BDck Features': 'Plain',
+    'BDck1 Lth': bdL?n(bdL,'Length'):'', 'BDck1 Wth': bdL?n(bdL,'Width'):'', 'BDck1 Ht': bdL?n(bdL,'Height'):'',
+    'BDck2 Lth': bdI?n(bdI,'Length'):'', 'BDck2 Wth': bdI?n(bdI,'Width'):'', 'BDck2 Ht': bdI?n(bdI,'Height'):'',
+    'Nail Schedule Info': nailStr,
+    'Pallet Size': (pL&&pW)?`${pL}x${pW}`:'',
+    'Notes2': noteText,
+    'BDFT':'','Stack Height':'','Top Deck Nails':'','Primary Nailer':'','Load Size':'','Customer Name':'',
+  };
+}
+
+document.getElementById('xml-input').addEventListener('change', function(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try { xmlData = parseXML(ev.target.result); showXMLPreview(); buildDiff(); }
+    catch(e) { showToast('error', 'XML error: ' + e.message); }
+  };
+  reader.readAsText(f);
+});
+
+const xmlDrop = document.getElementById('xml-drop');
+xmlDrop.addEventListener('dragover', e => { e.preventDefault(); xmlDrop.classList.add('drag-over'); });
+xmlDrop.addEventListener('dragleave', () => xmlDrop.classList.remove('drag-over'));
+xmlDrop.addEventListener('drop', e => {
+  e.preventDefault(); xmlDrop.classList.remove('drag-over');
+  const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]);
+  const inp = document.getElementById('xml-input'); inp.files = dt.files; inp.dispatchEvent(new Event('change'));
+});
+
+function showXMLPreview() {
+  document.getElementById('xml-loaded').style.display = 'block';
+  const c = document.getElementById('xml-fields');
+  const fields = [
+    ['Pallet ID', xmlData['Pallet Pt No']], ['Size', xmlData['Pallet Size']],
+    ['Shape', xmlData['Pallet Side Shape']], ['Entry', xmlData['Str Features']],
+    ['Stringers', `${xmlData['Str1 Qty']} ext / ${xmlData['Str2 Qty']||0} int`],
+    ['Top Deck', `${xmlData['TDck1 Qty']} lead + ${xmlData['TDck2 Qty']} int`],
+    ['Bottom Deck', `${xmlData['BDck1 Qty']} lead + ${xmlData['BDck2 Qty']||0} int`],
+    ['Nails', xmlData['Nail Schedule Info']],
+  ];
+  c.innerHTML = fields.map(([k,v]) => `<div class="field-row"><span class="field-key">${k}</span><span class="field-val ${v?'':'empty'}">${v||'—'}</span></div>`).join('');
+  c.style.display = 'grid';
+}
+
+function buildDiff() {
+  if (!dbRows.length) { showToast('error', 'SharePoint still loading — try again in a moment.'); return; }
+  document.getElementById('empty-hint').style.display = 'none';
+  document.getElementById('diff-section').style.display = 'block';
+  const pid = xmlData['Pallet Pt No'];
+  existingRowIdx = dbRows.findIndex(r => String(r['Pallet Pt No']).trim().toUpperCase() === pid.toUpperCase());
+  const isNew = existingRowIdx === -1;
+  const existing = isNew ? {} : dbRows[existingRowIdx];
+  document.getElementById('diff-title').textContent = isNew ? `NEW PALLET: ${pid}` : `UPDATE: ${pid}`;
+  document.getElementById('diff-subtitle').textContent = isNew
+    ? 'Not found in database — a new row will be added.'
+    : 'Found in database — review changes before saving to SharePoint.';
+  const badge = document.getElementById('diff-mode-badge');
+  badge.textContent = isNew ? 'NEW' : 'UPDATE';
+  badge.className = 'diff-mode-badge ' + (isNew ? 'mode-new' : 'mode-update');
+  document.getElementById('protect-note').style.display = isNew ? 'none' : 'block';
+
+  const cols = [
+    'Pallet Pt No','Pallet Side Shape','Str1 Qty','Str2 Qty','Str Features',
+    'Str1 Lth','Str1 Wth','Str1 Ht','Str2 Lth','Str2 Wth','Str2 Ht',
+    'TDck Wing','TDck1 Qty','TDck2 Qty','TDck Features',
+    'TDck1 Lth','TDck1 Wth','TDck1 Ht','TDck2 Lth','TDck2 Wth','TDck2 Ht',
+    'BDck Wing','BDck1 Qty','BDck2 Qty','BDck Features',
+    'BDck1 Lth','BDck1 Wth','BDck1 Ht','BDck2 Lth','BDck2 Wth','BDck2 Ht',
+    'Nail Schedule Info','Pallet Size','Notes2','BDFT','Stack Height',
+    'Top Deck Nails','Primary Nailer','Load Size','Customer Name'
+  ];
+
+  const tbody = document.getElementById('diff-tbody');
+  tbody.innerHTML = '';
+  cols.forEach(col => {
+    const inc = xmlData[col]!==undefined && xmlData[col]!=='' ? String(xmlData[col]).trim() : null;
+    const cur = existing[col]!==undefined && existing[col]!=='' ? String(existing[col]).trim() : null;
+    const prot = PROTECTED.includes(col);
+    let status, rowClass;
+    if (isNew) { status=inc?'new':'empty'; rowClass=inc?'diff-row-new':''; }
+    else if (prot)         { status='protected'; rowClass=''; }
+    else if (!inc)         { status='no-data';   rowClass=''; }
+    else if (cur===inc)    { status='same';       rowClass=''; }
+    else                   { status='changed';    rowClass='diff-row-changed'; }
+
+    const visible = showSameRows || ['changed','new','protected'].includes(status);
+    const canCheck = !prot && (status==='changed'||status==='new'||(isNew&&inc));
+    const curCell = cur ? (status==='changed'?`<span class="val-old">${cur}</span>`:`<span class="val-same">${cur}</span>`) : `<span class="val-empty">—</span>`;
+    const incCell = inc ? (['changed','new'].includes(status)?`<span class="val-new">${inc}</span>`:`<span class="val-same">${inc}</span>`) : `<span class="val-empty">—</span>`;
+    const tag = prot?`<span class="change-tag tag-manual">🔒 Protected</span>`
+      :status==='changed'?`<span class="change-tag tag-changed">Changed</span>`
+      :status==='new'?`<span class="change-tag tag-new">New</span>`
+      :status==='empty'?`<span class="change-tag tag-same">No data</span>`
+      :`<span class="change-tag tag-same">Unchanged</span>`;
+
+    const tr = document.createElement('tr');
+    tr.className = rowClass; tr.dataset.status = status;
+    if (!visible) tr.style.display = 'none';
+    tr.innerHTML = `
+      <td class="checkbox-col">${canCheck?`<input type="checkbox" class="field-checkbox" data-col="${col}" checked onchange="updateApplyNote()">`:''}</td>
+      <td style="font-family:var(--mono);font-size:11px">${col}</td>
+      <td>${curCell}</td><td>${incCell}</td><td>${tag}</td>`;
+    tbody.appendChild(tr);
+  });
+  updateApplyNote();
+  setStatus('green', `Diff ready for ${pid}`);
+}
+
+function toggleSameRows() {
+  showSameRows = !showSameRows;
+  document.getElementById('toggle-same-btn').textContent = showSameRows ? 'Hide unchanged fields' : 'Show unchanged fields';
+  document.querySelectorAll('#diff-tbody tr').forEach(tr => {
+    if (['same','no-data','empty'].includes(tr.dataset.status)) tr.style.display = showSameRows ? '' : 'none';
+  });
+}
+
+function toggleAll(cb) { document.querySelectorAll('.field-checkbox').forEach(c => c.checked = cb.checked); updateApplyNote(); }
+
+function updateApplyNote() {
+  const checked = document.querySelectorAll('.field-checkbox:checked').length;
+  const total = document.querySelectorAll('.field-checkbox').length;
+  document.getElementById('apply-note').textContent = `${checked} of ${total} fields selected`;
+  document.getElementById('apply-btn').disabled = checked === 0;
+}
+
+async function applyChanges() {
+  if (!spFileId) { showToast('error', 'SharePoint not connected.'); return; }
+  const checkedCols = new Set(Array.from(document.querySelectorAll('.field-checkbox:checked')).map(cb => cb.dataset.col));
+  showSaving('Re-downloading latest file...');
+  try {
+    await refreshToken();
+    const dlRes = await fetch(`${CONFIG.graphBase}/drives/${spFileId.driveId}/items/${spFileId.itemId}/content`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const buf = await dlRes.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const freshRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const pid = xmlData['Pallet Pt No'];
+    const freshIdx = freshRows.findIndex(r => String(r['Pallet Pt No']).trim().toUpperCase() === pid.toUpperCase());
+
+    if (freshIdx === -1) {
+      const newRow = {}; Object.keys(freshRows[0]||{}).forEach(k => newRow[k]='');
+      checkedCols.forEach(col => { if (xmlData[col]!==undefined) newRow[col]=xmlData[col]; });
+      freshRows.push(newRow);
+    } else {
+      checkedCols.forEach(col => {
+        if (!PROTECTED.includes(col) && xmlData[col]!==undefined && xmlData[col]!=='') freshRows[freshIdx][col]=xmlData[col];
+      });
+    }
+
+    setSaving('Building Excel...');
+    const newWs = XLSX.utils.json_to_sheet(freshRows);
+    wb.Sheets[wb.SheetNames[0]] = newWs;
+    const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+
+    setSaving('Uploading to SharePoint...');
+    await refreshToken();
+    const upRes = await fetch(`${CONFIG.graphBase}/drives/${spFileId.driveId}/items/${spFileId.itemId}/content`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/octet-stream' },
+      body: new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    });
+    if (!upRes.ok) throw new Error(`Upload failed: ${upRes.status}`);
+
+    dbRows = freshRows;
+    hideSaving();
+    showToast('success', `✓ ${freshIdx===-1?'New pallet added':'Pallet updated'}: ${pid}`);
+    setStatus('green', `Saved to SharePoint: ${pid}`);
+  } catch(e) { hideSaving(); showToast('error', 'Save failed: ' + e.message); setStatus('red', e.message); }
+}
+
+function resetImport() {
+  xmlData = null; existingRowIdx = -1; showSameRows = false;
+  document.getElementById('xml-input').value = '';
+  document.getElementById('xml-loaded').style.display = 'none';
+  document.getElementById('xml-fields').style.display = 'none';
+  document.getElementById('xml-fields').innerHTML = '';
+  document.getElementById('diff-section').style.display = 'none';
+  document.getElementById('diff-tbody').innerHTML = '';
+  document.getElementById('empty-hint').style.display = 'block';
+  setStatus('green', 'Ready — drop a new XML file');
+}
+
+function setStatus(c, t) { document.getElementById('status-dot').className='status-dot'+(c?' '+c:''); document.getElementById('status-text').textContent=t; }
+function showToast(type, msg) {
+  const t=document.getElementById('toast');
+  document.getElementById('toast-icon').textContent=type==='success'?'✓':'✕';
+  document.getElementById('toast-msg').textContent=msg;
+  t.className='show '+type; t.style.display='flex';
+  setTimeout(()=>{ t.style.display='none'; t.className=''; },4500);
+}
+function showSaving(msg) { document.getElementById('saving-sub').textContent=msg; document.getElementById('saving-overlay').classList.add('active'); }
+function setSaving(msg) { document.getElementById('saving-sub').textContent=msg; }
+function hideSaving() { document.getElementById('saving-overlay').classList.remove('active'); }
+
+init();
+</script>
+</body>
+</html>
